@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WhatsApp IA Bot — Arquitectura v1.0</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2128;
+    --border: #30363d;
+    --border-bright: #484f58;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --green: #3fb950;
+    --green-dim: #1a4a2e;
+    --blue: #58a6ff;
+    --blue-dim: #0d2644;
+    --purple: #bc8cff;
+    --purple-dim: #2d1f4e;
+    --orange: #f0883e;
+    --orange-dim: #3d2008;
+    --red: #f85149;
+    --red-dim: #3d0c0a;
+    --teal: #39d0c4;
+    --teal-dim: #0b3330;
+    --yellow: #e3b341;
+    --yellow-dim: #3a2a08;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    padding: 32px 20px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+
+  header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #58a6ff, #bc8cff, #3fb950);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  header p {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 6px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin: 4px;
+    font-weight: 500;
+  }
+  .badge-green { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); }
+  .badge-blue { background: var(--blue-dim); color: var(--blue); border: 1px solid var(--blue); }
+  .badge-purple { background: var(--purple-dim); color: var(--purple); border: 1px solid var(--purple); }
+
+  /* ====== DIAGRAM ====== */
+  .diagram-wrap {
+    max-width: 1100px;
+    margin: 0 auto 60px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .diagram-wrap::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--blue), var(--purple), var(--green));
+  }
+
+  .diagram-title {
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--muted);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .diagram-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* SVG diagram */
+  svg.arch {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  /* ====== TECH DETAIL SECTIONS ====== */
+  .sections {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: grid;
+    gap: 24px;
+  }
+
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .section-header:hover { background: var(--surface2); }
+
+  .section-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .section-header h2 {
+    font-size: 14px;
+    font-weight: 600;
+    flex: 1;
+  }
+
+  .section-header .chevron {
+    font-size: 10px;
+    color: var(--muted);
+    transition: transform 0.2s;
+  }
+  .section.open .chevron { transform: rotate(180deg); }
+
+  .section-body {
+    display: none;
+    padding: 20px;
+  }
+  .section.open .section-body { display: block; }
+
+  /* File tree */
+  .filetree {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.9;
+    color: var(--muted);
+  }
+  .filetree .dir { color: var(--blue); }
+  .filetree .file { color: var(--text); }
+  .filetree .comment { color: var(--muted); font-style: italic; }
+
+  /* Code block */
+  pre {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    overflow-x: auto;
+    color: var(--text);
+    margin: 12px 0;
+  }
+  .kw { color: var(--purple); }
+  .str { color: var(--green); }
+  .cm { color: var(--muted); }
+  .fn { color: var(--blue); }
+  .num { color: var(--orange); }
+  .typ { color: var(--teal); }
+
+  /* Cards grid */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+  }
+
+  .card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+  }
+
+  .card-label {
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .card-name {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .card-desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  .card-badge {
+    margin-top: 8px;
+  }
+
+  /* Step list */
+  .steps { list-style: none; counter-reset: step; }
+  .steps li {
+    counter-increment: step;
+    display: flex;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .steps li:last-child { border-bottom: none; }
+  .steps li::before {
+    content: counter(step, decimal-leading-zero);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--blue);
+    background: var(--blue-dim);
+    border: 1px solid var(--blue);
+    border-radius: 4px;
+    padding: 2px 6px;
+    flex-shrink: 0;
+    height: fit-content;
+    margin-top: 2px;
+  }
+
+  .tip {
+    background: var(--yellow-dim);
+    border: 1px solid var(--yellow);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 12px;
+    color: var(--yellow);
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  /* Flow table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  th {
+    text-align: left;
+    padding: 8px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+  td:first-child { font-family: 'JetBrains Mono', monospace; color: var(--blue); font-size: 11px; }
+  td code {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--surface2);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11px;
+  }
+
+</style>
+</head>
+<body>
+
+<header>
+  <h1>WhatsApp IA Bot — Arquitectura Local v1.0</h1>
+  <p>// con soporte MCP · Kubernetes-ready · 100% local</p>
+  <div style="margin-top:12px">
+    <span class="badge badge-green">Local First</span>
+    <span class="badge badge-blue">MCP Compatible</span>
+    <span class="badge badge-purple">Docker Compose</span>
+  </div>
+</header>
+
+<!-- =========== DIAGRAM =========== -->
+<div class="diagram-wrap">
+  <div class="diagram-title">// diagrama de arquitectura</div>
+
+  <svg class="arch" viewBox="0 0 1020 700" xmlns="http://www.w3.org/2000/svg" font-family="Inter,sans-serif">
+    <defs>
+      <!-- Gradients -->
+      <linearGradient id="gBlue" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#58a6ff" stop-opacity="0.15"/>
+        <stop offset="100%" stop-color="#58a6ff" stop-opacity="0.03"/>
+      </linearGradient>
+      <linearGradient id="gGreen" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#3fb950" stop-opacity="0.15"/>
+        <stop offset="100%" stop-color="#3fb950" stop-opacity="0.03"/>
+      </linearGradient>
+      <linearGradient id="gPurple" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#bc8cff" stop-opacity="0.15"/>
+        <stop offset="100%" stop-color="#bc8cff" stop-opacity="0.03"/>
+      </linearGradient>
+      <linearGradient id="gOrange" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#f0883e" stop-opacity="0.15"/>
+        <stop offset="100%" stop-color="#f0883e" stop-opacity="0.03"/>
+      </linearGradient>
+      <!-- Arrow markers -->
+      <marker id="arrowBlue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#58a6ff" opacity="0.8"/>
+      </marker>
+      <marker id="arrowGreen" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#3fb950" opacity="0.8"/>
+      </marker>
+      <marker id="arrowPurple" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#bc8cff" opacity="0.8"/>
+      </marker>
+      <marker id="arrowOrange" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#f0883e" opacity="0.8"/>
+      </marker>
+    </defs>
+
+    <!-- ===== BACKGROUND ZONES ===== -->
+    <!-- External zone -->
+    <rect x="10" y="10" width="200" height="680" rx="12" fill="none" stroke="#30363d" stroke-width="1" stroke-dasharray="4,4"/>
+    <text x="110" y="30" text-anchor="middle" font-size="10" fill="#484f58" font-family="JetBrains Mono,monospace">// EXTERNO</text>
+
+    <!-- Kubernetes zone -->
+    <rect x="220" y="10" width="590" height="680" rx="12" fill="url(#gBlue)" stroke="#30363d" stroke-width="1"/>
+    <text x="240" y="30" font-size="10" fill="#484f58" font-family="JetBrains Mono,monospace">⎈ kubernetes / docker-compose (local)</text>
+
+    <!-- Data zone -->
+    <rect x="820" y="10" width="190" height="680" rx="12" fill="none" stroke="#30363d" stroke-width="1" stroke-dasharray="4,4"/>
+    <text x="915" y="30" text-anchor="middle" font-size="10" fill="#484f58" font-family="JetBrains Mono,monospace">// FUENTES</text>
+
+    <!-- ===== EXTERNAL: WhatsApp & Meta ===== -->
+    <!-- WhatsApp icon circle -->
+    <circle cx="110" cy="90" r="28" fill="#1a4a2e" stroke="#3fb950" stroke-width="1.5"/>
+    <text x="110" y="96" text-anchor="middle" font-size="22" fill="#3fb950">📱</text>
+
+    <rect x="50" y="128" width="120" height="40" rx="6" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/>
+    <text x="110" y="143" text-anchor="middle" font-size="10" fill="#3fb950" font-weight="600">WhatsApp</text>
+    <text x="110" y="157" text-anchor="middle" font-size="9" fill="#8b949e">Meta Graph API</text>
+
+    <!-- Meta box -->
+    <rect x="50" y="220" width="120" height="50" rx="6" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
+    <text x="110" y="240" text-anchor="middle" font-size="16">𝕄</text>
+    <text x="110" y="258" text-anchor="middle" font-size="10" fill="#58a6ff" font-weight="600">Meta API</text>
+    <text x="110" y="270" text-anchor="middle" font-size="9" fill="#8b949e">Webhooks</text>
+
+    <!-- Ngrok/tunnel for local -->
+    <rect x="50" y="310" width="120" height="40" rx="6" fill="#3a2a08" stroke="#e3b341" stroke-width="1.5"/>
+    <text x="110" y="328" text-anchor="middle" font-size="10" fill="#e3b341" font-weight="600">ngrok / tunnel</text>
+    <text x="110" y="342" text-anchor="middle" font-size="9" fill="#8b949e">HTTPS local</text>
+
+    <!-- ===== CORE: Webhook Service ===== -->
+    <rect x="240" y="200" width="150" height="70" rx="8" fill="#0d2644" stroke="#58a6ff" stroke-width="1.5"/>
+    <text x="315" y="225" text-anchor="middle" font-size="11" fill="#58a6ff" font-weight="600">WebHook Service</text>
+    <text x="315" y="241" text-anchor="middle" font-size="9" fill="#8b949e">Node.js / FastAPI</text>
+    <text x="315" y="255" text-anchor="middle" font-size="9" fill="#8b949e">POST /webhook</text>
+
+    <!-- ===== CORE: IA Microservice ===== -->
+    <rect x="430" y="170" width="190" height="130" rx="10" fill="#2d1f4e" stroke="#bc8cff" stroke-width="2"/>
+    <text x="525" y="200" text-anchor="middle" font-size="13" fill="#bc8cff" font-weight="700">MicroServicio IA</text>
+    <text x="525" y="218" text-anchor="middle" font-size="10" fill="#8b949e">Python · FastAPI</text>
+    <text x="432" y="240" font-size="10" fill="#e6edf3">  🔹 LLM Orchestrator</text>
+    <text x="432" y="256" font-size="10" fill="#e6edf3">  🔹 RAG Engine</text>
+    <text x="432" y="272" font-size="10" fill="#e6edf3">  🔹 MCP Client Hub</text>
+    <text x="432" y="288" font-size="10" fill="#e6edf3">  🔹 Tool Router</text>
+
+    <!-- ===== CACHE: Redis ===== -->
+    <rect x="430" y="80" width="190" height="60" rx="8" fill="#3d0c0a" stroke="#f85149" stroke-width="1.5"/>
+    <text x="525" y="106" text-anchor="middle" font-size="11" fill="#f85149" font-weight="600">Redis Cache</text>
+    <text x="525" y="122" text-anchor="middle" font-size="9" fill="#8b949e">Sesiones · Rate limit · TTL</text>
+
+    <!-- ===== MCP Layer ===== -->
+    <rect x="640" y="80" width="160" height="220" rx="10" fill="#0b3330" stroke="#39d0c4" stroke-width="1.5"/>
+    <text x="720" y="105" text-anchor="middle" font-size="11" fill="#39d0c4" font-weight="700">MCP Layer</text>
+    <text x="720" y="120" text-anchor="middle" font-size="9" fill="#8b949e">Model Context Protocol</text>
+
+    <rect x="654" y="132" width="132" height="28" rx="5" fill="#0d1117" stroke="#39d0c4" stroke-width="1"/>
+    <text x="720" y="150" text-anchor="middle" font-size="10" fill="#39d0c4">📁 filesystem-mcp</text>
+
+    <rect x="654" y="166" width="132" height="28" rx="5" fill="#0d1117" stroke="#39d0c4" stroke-width="1"/>
+    <text x="720" y="184" text-anchor="middle" font-size="10" fill="#39d0c4">🔎 brave-search-mcp</text>
+
+    <rect x="654" y="200" width="132" height="28" rx="5" fill="#0d1117" stroke="#39d0c4" stroke-width="1"/>
+    <text x="720" y="218" text-anchor="middle" font-size="10" fill="#39d0c4">🗄️ postgres-mcp</text>
+
+    <rect x="654" y="234" width="132" height="28" rx="5" fill="#0d1117" stroke="#39d0c4" stroke-width="1"/>
+    <text x="720" y="252" text-anchor="middle" font-size="10" fill="#39d0c4">🧩 custom-mcp</text>
+
+    <text x="720" y="292" text-anchor="middle" font-size="9" fill="#8b949e">↕ stdio / SSE / HTTP</text>
+
+    <!-- ===== LLM (OpenAI / Local) ===== -->
+    <rect x="640" y="320" width="160" height="80" rx="8" fill="#3d2008" stroke="#f0883e" stroke-width="1.5"/>
+    <text x="720" y="348" text-anchor="middle" font-size="11" fill="#f0883e" font-weight="600">LLM Provider</text>
+    <text x="720" y="365" text-anchor="middle" font-size="9" fill="#8b949e">OpenAI / Anthropic</text>
+    <text x="720" y="381" text-anchor="middle" font-size="9" fill="#8b949e">Ollama (local)</text>
+
+    <!-- ===== DATABASES ===== -->
+    <!-- PostgreSQL -->
+    <rect x="240" y="480" width="180" height="80" rx="8" fill="#0d2644" stroke="#58a6ff" stroke-width="1.5"/>
+    <text x="330" y="504" text-anchor="middle" font-size="11" fill="#58a6ff" font-weight="600">PostgreSQL</text>
+    <text x="330" y="520" text-anchor="middle" font-size="9" fill="#8b949e">Historial · Usuarios</text>
+    <text x="330" y="536" text-anchor="middle" font-size="9" fill="#8b949e">Configuraciones</text>
+    <text x="330" y="550" text-anchor="middle" font-size="9" fill="#8b949e">Sessions · Logs</text>
+
+    <!-- Qdrant -->
+    <rect x="460" y="480" width="180" height="80" rx="8" fill="#2d1f4e" stroke="#bc8cff" stroke-width="1.5"/>
+    <text x="550" y="504" text-anchor="middle" font-size="11" fill="#bc8cff" font-weight="600">Qdrant</text>
+    <text x="550" y="520" text-anchor="middle" font-size="9" fill="#8b949e">Vector DB</text>
+    <text x="550" y="536" text-anchor="middle" font-size="9" fill="#8b949e">Embeddings · RAG</text>
+    <text x="550" y="550" text-anchor="middle" font-size="9" fill="#8b949e">Semantic search</text>
+
+    <!-- ===== DATA SOURCES ===== -->
+    <rect x="840" y="100" width="130" height="40" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+    <text x="905" y="116" text-anchor="middle" font-size="10" fill="#e6edf3">🌐 Web / API</text>
+    <text x="905" y="132" text-anchor="middle" font-size="9" fill="#8b949e">HTTP endpoints</text>
+
+    <rect x="840" y="160" width="130" height="40" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+    <text x="905" y="176" text-anchor="middle" font-size="10" fill="#e6edf3">📄 PDF / Docs</text>
+    <text x="905" y="192" text-anchor="middle" font-size="9" fill="#8b949e">Ingesta de documentos</text>
+
+    <rect x="840" y="220" width="130" height="40" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+    <text x="905" y="236" text-anchor="middle" font-size="10" fill="#e6edf3">📊 Excel / CSV</text>
+    <text x="905" y="252" text-anchor="middle" font-size="9" fill="#8b949e">Datos estructurados</text>
+
+    <rect x="840" y="280" width="130" height="40" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+    <text x="905" y="296" text-anchor="middle" font-size="10" fill="#e6edf3">🗄️ DB Connector</text>
+    <text x="905" y="312" text-anchor="middle" font-size="9" fill="#8b949e">SQL / NoSQL</text>
+
+    <!-- ===== ARROWS ===== -->
+    <!-- WhatsApp → Meta -->
+    <line x1="110" y1="168" x2="110" y2="218" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arrowGreen)" opacity="0.7"/>
+    <!-- Meta → ngrok -->
+    <line x1="110" y1="270" x2="110" y2="308" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrowBlue)" opacity="0.7"/>
+    <!-- ngrok → Webhook -->
+    <line x1="170" y1="330" x2="238" y2="235" stroke="#e3b341" stroke-width="1.5" marker-end="url(#arrowBlue)" stroke-dasharray="5,3" opacity="0.8"/>
+    <!-- Webhook ↔ IA -->
+    <line x1="390" y1="235" x2="428" y2="235" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrowBlue)" opacity="0.9"/>
+    <line x1="428" y1="245" x2="390" y2="245" stroke="#58a6ff" stroke-width="1" marker-end="url(#arrowBlue)" opacity="0.5"/>
+    <!-- IA → Redis -->
+    <line x1="525" y1="170" x2="525" y2="142" stroke="#f85149" stroke-width="1.5" marker-end="url(#arrowBlue)" opacity="0.8"/>
+    <!-- IA → MCP -->
+    <line x1="622" y1="220" x2="638" y2="200" stroke="#39d0c4" stroke-width="2" marker-end="url(#arrowGreen)" opacity="0.9"/>
+    <!-- IA → LLM -->
+    <line x1="622" y1="270" x2="638" y2="360" stroke="#f0883e" stroke-width="1.5" marker-end="url(#arrowOrange)" opacity="0.8"/>
+    <!-- IA → PostgreSQL -->
+    <line x1="480" y1="300" x2="370" y2="478" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrowBlue)" stroke-dasharray="4,3" opacity="0.7"/>
+    <!-- IA → Qdrant -->
+    <line x1="525" y1="300" x2="525" y2="478" stroke="#bc8cff" stroke-width="1.5" marker-end="url(#arrowPurple)" opacity="0.7"/>
+    <!-- MCP → Sources -->
+    <line x1="800" y1="150" x2="838" y2="135" stroke="#39d0c4" stroke-width="1" marker-end="url(#arrowGreen)" opacity="0.6"/>
+    <line x1="800" y1="180" x2="838" y2="188" stroke="#39d0c4" stroke-width="1" marker-end="url(#arrowGreen)" opacity="0.6"/>
+    <line x1="800" y1="210" x2="838" y2="242" stroke="#39d0c4" stroke-width="1" marker-end="url(#arrowGreen)" opacity="0.6"/>
+    <line x1="800" y1="240" x2="838" y2="295" stroke="#39d0c4" stroke-width="1" marker-end="url(#arrowGreen)" opacity="0.6"/>
+
+    <!-- MCP → PostgreSQL (postgres-mcp) -->
+    <path d="M720,310 Q720,380 620,430 Q520,480 460,510" stroke="#39d0c4" stroke-width="1" fill="none" marker-end="url(#arrowGreen)" stroke-dasharray="4,3" opacity="0.5"/>
+
+    <!-- ===== LEGEND ===== -->
+    <rect x="240" y="600" width="560" height="70" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+    <text x="270" y="618" font-size="9" fill="#484f58" font-family="JetBrains Mono,monospace">LEGEND</text>
+    <line x1="270" y1="635" x2="310" y2="635" stroke="#58a6ff" stroke-width="2" marker-end="url(#arrowBlue)"/>
+    <text x="318" y="639" font-size="10" fill="#8b949e">HTTP / REST</text>
+    <line x1="390" y1="635" x2="430" y2="635" stroke="#39d0c4" stroke-width="2" marker-end="url(#arrowGreen)"/>
+    <text x="438" y="639" font-size="10" fill="#8b949e">MCP Protocol</text>
+    <line x1="510" y1="635" x2="550" y2="635" stroke="#f0883e" stroke-width="2" marker-end="url(#arrowOrange)"/>
+    <text x="558" y="639" font-size="10" fill="#8b949e">LLM API</text>
+    <line x1="620" y1="635" x2="660" y2="635" stroke="#e3b341" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrowBlue)"/>
+    <text x="668" y="639" font-size="10" fill="#8b949e">Tunnel (dev)</text>
+
+    <text x="270" y="658" font-size="10" fill="#8b949e">Ingesta docs: PDF/Excel/Web → Embeddings → Qdrant (offline, batch job)</text>
+  </svg>
+</div>
+
+<!-- =========== TECH SECTIONS =========== -->
+<div class="sections">
+
+  <!-- 1. Stack -->
+  <div class="section open">
+    <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
+      <div class="section-icon" style="background:#0d2644">🧱</div>
+      <h2>Stack Tecnológico</h2>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="section-body">
+      <div class="cards">
+        <div class="card">
+          <div class="card-label">API Gateway</div>
+          <div class="card-name" style="color:#3fb950">WhatsApp via Meta</div>
+          <div class="card-desc">Cloud API (Meta) + webhook HTTPS. En local se usa <strong>ngrok</strong> o <strong>cloudflared</strong> para exponer el puerto.</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Webhook Service</div>
+          <div class="card-name" style="color:#58a6ff">FastAPI / Node.js</div>
+          <div class="card-desc">Valida firma HMAC-SHA256 de Meta, encola mensajes en Redis y responde 200 OK en &lt;2s.</div>
+        </div>
+        <div class="card">
+          <div class="card-label">IA Core</div>
+          <div class="card-name" style="color:#bc8cff">Python · FastAPI</div>
+          <div class="card-desc">Orquesta LLM, RAG y herramientas MCP. LangChain / LlamaIndex para el pipeline RAG.</div>
+        </div>
+        <div class="card">
+          <div class="card-label">LLM</div>
+          <div class="card-name" style="color:#f0883e">OpenAI / Ollama</div>
+          <div class="card-desc"><strong>Dev local:</strong> Ollama con llama3.2 o mistral. <strong>Prod:</strong> GPT-4o / Claude Sonnet.</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Cache</div>
+          <div class="card-name" style="color:#f85149">Redis</div>
+          <div class="card-desc">Historial de conversación en memoria (TTL 24h), rate-limiting por número, cola de tareas con BullMQ.</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Base de datos</div>
+          <div class="card-name" style="color:#58a6ff">PostgreSQL 16</div>
+          <div class="card-desc">Usuarios, historial largo, configuraciones, logs de herramientas.</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Vector DB</div>
+          <div class="card-name" style="color:#bc8cff">Qdrant</div>
+          <div class="card-desc">Embeddings de documentos para búsqueda semántica (RAG). text-embedding-3-small o nomic-embed.</div>
+        </div>
+        <div class="card">
+          <div class="card-label">MCP Protocol</div>
+          <div class="card-name" style="color:#39d0c4">MCP Servers</div>
+          <div class="card-desc">Herramientas extensibles via stdio/SSE: filesystem, postgres, brave-search, y servidores custom.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Estructura -->
+  <div class="section open">
+    <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
+      <div class="section-icon" style="background:#1a4a2e">📁</div>
+      <h2>Estructura del Proyecto</h2>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="section-body">
+<pre><span class="dir">whatsapp-ia-bot/</span>
+├── <span class="dir">docker-compose.yml</span>          <span class="cm"># orquesta todos los servicios</span>
+├── <span class="dir">.env.example</span>
+│
+├── <span class="dir">services/</span>
+│   ├── <span class="dir">webhook/</span>                 <span class="cm"># Node.js / FastAPI</span>
+│   │   ├── src/
+│   │   │   ├── index.ts
+│   │   │   ├── meta.verify.ts     <span class="cm"># HMAC validation</span>
+│   │   │   └── queue.ts           <span class="cm"># Redis BullMQ enqueue</span>
+│   │   └── Dockerfile
+│   │
+│   ├── <span class="dir">ia-core/</span>                 <span class="cm"># Python FastAPI</span>
+│   │   ├── app/
+│   │   │   ├── main.py
+│   │   │   ├── <span class="dir">agents/</span>
+│   │   │   │   ├── orchestrator.py  <span class="cm"># LLM chain + tool router</span>
+│   │   │   │   └── rag.py          <span class="cm"># RAG pipeline</span>
+│   │   │   ├── <span class="dir">mcp/</span>
+│   │   │   │   ├── client.py       <span class="cm"># MCP client hub</span>
+│   │   │   │   └── registry.py     <span class="cm"># server registry</span>
+│   │   │   ├── <span class="dir">tools/</span>
+│   │   │   │   ├── whatsapp.py     <span class="cm"># send message</span>
+│   │   │   │   └── embedder.py     <span class="cm"># ingest docs</span>
+│   │   │   └── <span class="dir">db/</span>
+│   │   │       ├── postgres.py
+│   │   │       └── qdrant.py
+│   │   ├── requirements.txt
+│   │   └── Dockerfile
+│   │
+│   └── <span class="dir">mcp-servers/</span>
+│       ├── filesystem/             <span class="cm"># @modelcontextprotocol/server-filesystem</span>
+│       ├── postgres/               <span class="cm"># @modelcontextprotocol/server-postgres</span>
+│       └── custom/                 <span class="cm"># tu propio MCP server</span>
+│           ├── server.py
+│           └── tools.py
+│
+├── <span class="dir">ingestion/</span>                   <span class="cm"># scripts batch</span>
+│   ├── ingest_pdf.py
+│   ├── ingest_excel.py
+│   └── ingest_web.py
+│
+└── <span class="dir">infra/</span>
+    ├── k8s/                        <span class="cm"># manifests Kubernetes</span>
+    └── nginx/                      <span class="cm"># reverse proxy</span></pre>
+    </div>
+  </div>
+
+  <!-- 3. Docker Compose -->
+  <div class="section open">
+    <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
+      <div class="section-icon" style="background:#0d2644">🐳</div>
+      <h2>docker-compose.yml</h2>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="section-body">
+<pre><span class="kw">version</span>: <span class="str">'3.9'</span>
+<span class="kw">services</span>:
+
+  <span class="fn">webhook</span>:
+    <span class="kw">build</span>: <span class="str">./services/webhook</span>
+    <span class="kw">ports</span>: [<span class="str">"3000:3000"</span>]
+    <span class="kw">env_file</span>: .env
+    <span class="kw">depends_on</span>: [redis]
+
+  <span class="fn">ia-core</span>:
+    <span class="kw">build</span>: <span class="str">./services/ia-core</span>
+    <span class="kw">ports</span>: [<span class="str">"8000:8000"</span>]
+    <span class="kw">env_file</span>: .env
+    <span class="kw">depends_on</span>: [redis, postgres, qdrant]
+    <span class="kw">volumes</span>:
+      - <span class="str">./docs:/app/docs</span>       <span class="cm"># tus documentos para ingestar</span>
+
+  <span class="fn">redis</span>:
+    <span class="kw">image</span>: <span class="str">redis:7-alpine</span>
+    <span class="kw">ports</span>: [<span class="str">"6379:6379"</span>]
+
+  <span class="fn">postgres</span>:
+    <span class="kw">image</span>: <span class="str">postgres:16-alpine</span>
+    <span class="kw">environment</span>:
+      POSTGRES_DB: whatsapp_ia
+      POSTGRES_USER: <span class="str">${DB_USER}</span>
+      POSTGRES_PASSWORD: <span class="str">${DB_PASS}</span>
+    <span class="kw">volumes</span>: [pgdata:/var/lib/postgresql/data]
+
+  <span class="fn">qdrant</span>:
+    <span class="kw">image</span>: <span class="str">qdrant/qdrant:latest</span>
+    <span class="kw">ports</span>: [<span class="str">"6333:6333"</span>]
+    <span class="kw">volumes</span>: [qdrant_storage:/qdrant/storage]
+
+  <span class="fn">ollama</span>:                        <span class="cm"># LLM local (opcional)</span>
+    <span class="kw">image</span>: <span class="str">ollama/ollama</span>
+    <span class="kw">ports</span>: [<span class="str">"11434:11434"</span>]
+    <span class="kw">volumes</span>: [ollama_models:/root/.ollama]
+
+  <span class="fn">ngrok</span>:                         <span class="cm"># tunnel para Meta webhook</span>
+    <span class="kw">image</span>: <span class="str">ngrok/ngrok:latest</span>
+    <span class="kw">command</span>: <span class="str">http webhook:3000</span>
+    <span class="kw">environment</span>:
+      NGROK_AUTHTOKEN: <span class="str">${NGROK_TOKEN}</span>
+
+<span class="kw">volumes</span>: {pgdata, qdrant_storage, ollama_models}</pre>
+    </div>
+  </div>
+
+  <!-- 4. MCP -->
+  <div class="section open">
+    <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
+      <div class="section-icon" style="background:#0b3330">🧩</div>
+      <h2>Integración MCP — Model Context Protocol</h2>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="section-body">
+      <p style="font-size:13px;color:#8b949e;margin-bottom:16px">El MCP Client Hub en <code>ia-core</code> se conecta a cada servidor MCP y expone sus herramientas al LLM como funciones.</p>
+<pre><span class="cm"># services/ia-core/app/mcp/client.py</span>
+<span class="kw">from</span> mcp <span class="kw">import</span> ClientSession, StdioServerParameters
+<span class="kw">from</span> mcp.client.stdio <span class="kw">import</span> stdio_client
+
+<span class="kw">class</span> <span class="typ">MCPHub</span>:
+    servers = {
+        <span class="str">"filesystem"</span>: StdioServerParameters(
+            command=<span class="str">"npx"</span>,
+            args=[<span class="str">"-y"</span>, <span class="str">"@modelcontextprotocol/server-filesystem"</span>, <span class="str">"/app/docs"</span>]
+        ),
+        <span class="str">"postgres"</span>: StdioServerParameters(
+            command=<span class="str">"npx"</span>,
+            args=[<span class="str">"-y"</span>, <span class="str">"@modelcontextprotocol/server-postgres"</span>],
+            env={<span class="str">"DATABASE_URL"</span>: <span class="str">"${DATABASE_URL}"</span>}
+        ),
+        <span class="str">"custom"</span>: StdioServerParameters(
+            command=<span class="str">"python"</span>,
+            args=[<span class="str">"/app/mcp-servers/custom/server.py"</span>]
+        ),
+    }
+
+    <span class="kw">async def</span> <span class="fn">get_tools</span>(self, server_name: str) -> list:
+        <span class="kw">async with</span> stdio_client(self.servers[server_name]) <span class="kw">as</span> (r, w):
+            <span class="kw">async with</span> ClientSession(r, w) <span class="kw">as</span> session:
+                <span class="kw">await</span> session.initialize()
+                tools = <span class="kw">await</span> session.list_tools()
+                <span class="kw">return</span> tools.tools
+
+    <span class="kw">async def</span> <span class="fn">call_tool</span>(self, server: str, tool: str, args: dict):
+        <span class="kw">async with</span> stdio_client(self.servers[server]) <span class="kw">as</span> (r, w):
+            <span class="kw">async with</span> ClientSession(r, w) <span class="kw">as</span> session:
+                <span class="kw">await</span> session.initialize()
+                result = <span class="kw">await</span> session.call_tool(tool, args)
+                <span class="kw">return</span> result</pre>
+
+      <div class="tip">⚡ Para agregar un nuevo MCP server: crea el archivo en <code>mcp-servers/custom/server.py</code>, regístralo en <code>MCPHub.servers</code> y reinicia <code>ia-core</code>. Sin cambios en el LLM ni en el webhook.</div>
+    </div>
+  </div>
+
+  <!-- 5. Flujo de mensaje -->
+  <div class="section open">
+    <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
+      <div class="section-icon" style="background:#3d2008">⚡</div>
+      <h2>Flujo de Mensaje (Request → Response)</h2>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="section-body">
+      <ol class="steps">
+        <li><strong>Usuario envía mensaje</strong> en WhatsApp → Meta llama al webhook HTTPS en tu servidor (ngrok en local)</li>
+        <li><strong>Webhook service</strong> valida la firma SHA256 de Meta, extrae el texto/media y publica en cola Redis con BullMQ</li>
+        <li><strong>ia-core worker</strong> consume el mensaje de la cola, recupera contexto de conversación de Redis (últimos N turnos)</li>
+        <li><strong>RAG Engine</strong> genera embedding del mensaje y busca chunks relevantes en Qdrant (si aplica)</li>
+        <li><strong>Orchestrator</strong> construye el prompt con: system prompt + contexto Redis + chunks RAG + herramientas MCP disponibles</li>
+        <li><strong>LLM call</strong> (OpenAI / Ollama): si el modelo invoca una tool, el orchestrator la ejecuta via MCP Hub y vuelve a llamar al LLM con el resultado</li>
+        <li><strong>Respuesta final</strong> → ia-core llama a la API de WhatsApp (Meta Graph) para enviar el mensaje de vuelta al usuario</li>
+        <li><strong>Persistencia</strong>: el turno completo se guarda en PostgreSQL para historial largo y auditoría</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- 6. Variables de entorno -->
+  <div class="section">
+    <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
+      <div class="section-icon" style="background:#1a4a2e">🔑</div>
+      <h2>Variables de Entorno (.env)</h2>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="section-body">
+<pre><span class="cm"># Meta / WhatsApp</span>
+WHATSAPP_TOKEN=<span class="str">EAA...</span>
+WHATSAPP_PHONE_ID=<span class="num">1234567890</span>
+META_VERIFY_TOKEN=<span class="str">mi_token_secreto</span>
+META_APP_SECRET=<span class="str">abc123...</span>
+
+<span class="cm"># LLM</span>
+OPENAI_API_KEY=<span class="str">sk-...</span>          <span class="cm"># o vacío si usas Ollama</span>
+OLLAMA_BASE_URL=<span class="str">http://ollama:11434</span>
+LLM_PROVIDER=<span class="str">openai</span>            <span class="cm"># openai | ollama | anthropic</span>
+LLM_MODEL=<span class="str">gpt-4o-mini</span>
+
+<span class="cm"># Embeddings</span>
+EMBEDDING_MODEL=<span class="str">text-embedding-3-small</span>
+EMBEDDING_PROVIDER=<span class="str">openai</span>     <span class="cm"># openai | ollama</span>
+
+<span class="cm"># Bases de datos</span>
+DATABASE_URL=<span class="str">postgresql://user:pass@postgres:5432/whatsapp_ia</span>
+REDIS_URL=<span class="str">redis://redis:6379</span>
+QDRANT_URL=<span class="str">http://qdrant:6333</span>
+QDRANT_COLLECTION=<span class="str">docs</span>
+
+<span class="cm"># Tunnel (desarrollo local)</span>
+NGROK_TOKEN=<span class="str">tu_ngrok_token</span>
+
+<span class="cm"># MCP</span>
+MCP_FILESYSTEM_PATH=<span class="str">/app/docs</span>
+MCP_ENABLE_SEARCH=<span class="str">false</span>       <span class="cm"># brave search MCP</span>
+BRAVE_API_KEY=<span class="str">...</span></pre>
+    </div>
+  </div>
+
+  <!-- 7. Setup local -->
+  <div class="section">
+    <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
+      <div class="section-icon" style="background:#3a2a08">🚀</div>
+      <h2>Setup Local — Paso a Paso</h2>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="section-body">
+      <table>
+        <tr><th>#</th><th>Paso</th><th>Comando / Acción</th></tr>
+        <tr>
+          <td>01</td>
+          <td>Clonar y configurar env</td>
+          <td><code>cp .env.example .env</code> → llenar tokens</td>
+        </tr>
+        <tr>
+          <td>02</td>
+          <td>Levantar infraestructura</td>
+          <td><code>docker compose up -d redis postgres qdrant</code></td>
+        </tr>
+        <tr>
+          <td>03</td>
+          <td>Ejecutar migraciones</td>
+          <td><code>docker compose run ia-core python -m alembic upgrade head</code></td>
+        </tr>
+        <tr>
+          <td>04</td>
+          <td>Crear colección Qdrant</td>
+          <td><code>docker compose run ia-core python scripts/init_qdrant.py</code></td>
+        </tr>
+        <tr>
+          <td>05</td>
+          <td>Ingestar documentos</td>
+          <td><code>docker compose run ia-core python ingestion/ingest_pdf.py ./docs/</code></td>
+        </tr>
+        <tr>
+          <td>06</td>
+          <td>Levantar LLM local (opcional)</td>
+          <td><code>docker compose up -d ollama</code> → <code>ollama pull llama3.2</code></td>
+        </tr>
+        <tr>
+          <td>07</td>
+          <td>Levantar todos los servicios</td>
+          <td><code>docker compose up -d</code></td>
+        </tr>
+        <tr>
+          <td>08</td>
+          <td>Exponer con ngrok</td>
+          <td><code>docker compose up ngrok</code> → copiar URL HTTPS</td>
+        </tr>
+        <tr>
+          <td>09</td>
+          <td>Registrar webhook en Meta</td>
+          <td>Meta Developers → <code>{ngrok_url}/webhook</code> → verify token</td>
+        </tr>
+        <tr>
+          <td>10</td>
+          <td>Test de extremo a extremo</td>
+          <td>Envía "hola" desde WhatsApp 🎉</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- 8. Dependencias -->
+  <div class="section">
+    <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
+      <div class="section-icon" style="background:#2d1f4e">📦</div>
+      <h2>Dependencias Clave</h2>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="section-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div>
+          <div style="font-size:11px;font-family:JetBrains Mono,monospace;color:#8b949e;margin-bottom:8px">requirements.txt (ia-core)</div>
+<pre>fastapi
+uvicorn[standard]
+mcp                     <span class="cm"># MCP SDK</span>
+openai
+langchain
+langchain-openai
+langchain-community
+llama-index
+qdrant-client
+sqlalchemy[asyncio]
+alembic
+redis[asyncio]
+httpx
+pydantic-settings
+python-multipart
+pypdf2                  <span class="cm"># ingesta PDF</span>
+openpyxl                <span class="cm"># ingesta Excel</span>
+beautifulsoup4          <span class="cm"># scraping web</span></pre>
+        </div>
+        <div>
+          <div style="font-size:11px;font-family:JetBrains Mono,monospace;color:#8b949e;margin-bottom:8px">package.json (webhook)</div>
+<pre>{
+  "dependencies": {
+    "fastify": "^4",
+    "bullmq": "^5",
+    "ioredis": "^5",
+    "axios": "^1"
+  }
+}
+
+<span class="cm"># MCP servers (npx, sin instalar)</span>
+@modelcontextprotocol/server-filesystem
+@modelcontextprotocol/server-postgres
+@modelcontextprotocol/server-brave-search</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /sections -->
+
+<footer style="text-align:center;padding:40px 20px;color:#484f58;font-size:11px;font-family:JetBrains Mono,monospace">
+  v1.0 · local-first · MCP ready · docker-compose · kubernetes-ready
+</footer>
+
+<script>
+  // All sections start open except last ones - already set via class
+</script>
+</body>
+</html>

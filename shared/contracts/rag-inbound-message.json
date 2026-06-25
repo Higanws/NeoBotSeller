@@ -1,0 +1,13 @@
+{
+  "$schema": "inbound-message-v1",
+  "description": "Mensaje normalizado webhook → RAG API",
+  "fields": {
+    "wa_id": "string",
+    "text": "string",
+    "message_id": "string",
+    "contact_name": "string",
+    "source": "whatsapp | simulator | unknown",
+    "phone_number_id": "string",
+    "timestamp": "string"
+  }
+}
