@@ -18,7 +18,7 @@ OLLAMA_BASE_URL=http://localhost:11434
 
 Asegúrate de tener el modelo: `ollama pull llama3.2`
 
-### OpenAI (cloud)
+### OpenAI (cloud o LM Studio)
 
 ```env
 LLM_PROVIDER=openai
@@ -26,20 +26,20 @@ LLM_MODEL=gpt-4o-mini
 OPENAI_API_KEY=sk-...
 ```
 
-## Odoo MCP (stock + CRM)
+## Herramientas (actions-service)
 
-El orquestador usa el **mismo contrato de herramientas** que `Odoo/mcp-server` vía MCP Hub:
+Todas las tools (Odoo + RAG) se cargan y ejecutan vía **RAG/actions-service**:
 
 ```env
-ODOO_MCP_ENABLED=true
-ODOO_URL=http://localhost:8069
-ODOO_DB_NAME=neobotseller
-ODOO_LOGIN=admin
-ODOO_USER_PASSWORD=admin
-MAX_TOOL_ROUNDS=3
+ACTIONS_SERVICE_URL=http://localhost:8092
+MAX_TOOL_ROUNDS=5
 ```
 
+Levantar actions-service con Odoo en `:8069`. Ver `RAG/actions-service/README.md`.
+
 Herramientas CRM/clientes: `crm_create_customer`, `crm_assign_advisor`, `crm_list_advisors`, `crm_search_customer`, `crm_create_lead`, etc.
+
+Para consultar desde Cursor sin chat: mismos endpoints HTTP (`GET /v1/tools`, `POST /v1/tools/call`).
 
 ## Conversation service (Redis/)
 
@@ -54,8 +54,6 @@ cd Redis/conversation-service && PYTHONPATH=src uvicorn conversation_service.mai
 CONVERSATION_SERVICE_URL=http://localhost:8093
 CONVERSATION_SERVICE_ENABLED=true
 ```
-
-Requiere Odoo local (`cd Odoo && docker compose up -d`).
 
 ## Inicio
 
@@ -96,8 +94,6 @@ WEBHOOK_DEV_ECHO=false
 
 Flujo: **webhook → RAG API → ia-core**. Meta y Streamlit usan el mismo `POST /webhook`.
 
-Fallback legacy: `IA_CORE_URL` si RAG no está configurado.
-
 ## Estructura
 
 ```text
@@ -105,13 +101,13 @@ ia-core/
 ├── .env.example
 └── src/ia_core/
     ├── config.py           # Carga .env (pydantic-settings)
-    ├── orchestrator.py     # Contexto + LLM + MCP
-    ├── tool_router.py      # Bucle LLM ↔ herramientas Odoo
+    ├── orchestrator.py     # Contexto + LLM + tools
+    ├── tool_router.py      # Bucle LLM ↔ actions-service
     ├── memory/
     │   └── redis_store.py    # Cliente HTTP → conversation-service
     ├── main.py
     ├── mcp_hub/
-    │   └── odoo_hub.py     # Mismo contrato que neobotseller-odoo-mcp
+    │   └── actions_hub.py  # Cliente HTTP → RAG/actions-service
     └── llm/
         ├── factory.py      # Selección openai | ollama
         ├── openai_provider.py

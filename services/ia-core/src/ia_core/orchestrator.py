@@ -9,7 +9,6 @@ from typing import Any
 from ia_core.config import Settings, get_settings
 from ia_core.llm.factory import create_llm_provider
 from ia_core.mcp_hub.actions_hub import ActionsHub
-from ia_core.mcp_hub.odoo_hub import OdooMcpHub
 from ia_core.memory import create_conversation_store
 from ia_core.tool_router import ToolRouter
 
@@ -40,12 +39,10 @@ class Orchestrator:
             fallback_max_turns=self.settings.conversation_max_turns,
             fallback_inactivity_seconds=self.settings.conversation_ttl_seconds,
         )
-        self.odoo_hub = OdooMcpHub(self.settings)
         self.actions_hub = ActionsHub(self.settings)
         self.tool_router = ToolRouter(
             self.llm,
             self.actions_hub,
-            self.odoo_hub,
             max_rounds=self.settings.max_tool_rounds,
         )
 
@@ -121,14 +118,22 @@ class Orchestrator:
                 for t in tools
                 if t.get("function", {}).get("name")
             ]
+            has_rag = "rag_search_documents" in names
             base += (
                 "\n\nTienes herramientas disponibles. "
                 "Decide tú cuándo invocarlas según la intención del usuario:\n"
-                "- Odoo (stock, CRM, clientes): datos operativos del ERP.\n"
-                "- rag_search_documents: documentación en PDFs (catálogos, políticas, manuales). "
-                "Úsala cuando necesites información que no está en Odoo.\n"
-                f"Herramientas: {', '.join(names)}."
+                "- Odoo (stock, CRM, clientes): datos operativos del ERP en tiempo real.\n"
             )
+            if has_rag:
+                base += (
+                    "- rag_search_documents: base documental indexada (PDFs: catálogos, "
+                    "políticas, manuales, garantías, procedimientos). "
+                    "Úsala de forma proactiva ante cualquier duda: si no tienes certeza, "
+                    "la respuesta puede estar en los documentos, o el usuario pregunta algo "
+                    "que no cubre Odoo. Consulta Qdrant con esta herramienta antes de "
+                    "inventar, suponer o decir que no dispones de la información.\n"
+                )
+            base += f"Herramientas: {', '.join(names)}."
         else:
             base += "\n\nNo hay herramientas externas disponibles; responde solo con tu conocimiento."
 
@@ -139,8 +144,8 @@ class Orchestrator:
         return {
             "provider": self.settings.llm_provider,
             "model": self.settings.llm_model,
-            "odoo_mcp_enabled": self.odoo_hub.enabled,
             "actions_service_enabled": self.actions_hub.enabled,
+            "actions_service_url": self.settings.actions_service_url,
             "memory_backend": mem_stats.get("backend"),
             "active_conversations": mem_stats.get("conversations"),
             "session_inactivity_seconds": mem_stats.get("inactivity_seconds"),

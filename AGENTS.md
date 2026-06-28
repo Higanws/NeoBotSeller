@@ -10,7 +10,7 @@ NeoBotSeller/
 ├── Streamlit/             Simulador WhatsApp (solo consume webhook)
 ├── RAG/                   Entrada mensajes, actions MCP, embeddings, Qdrant
 ├── services/ia-core/      Motor LLM + orquestación agentica
-├── Odoo/                  ERP local + connectors + mcp-server
+├── Odoo/                  ERP local + connectors XML-RPC
 ├── Redis/                 Sesiones conversacionales (conversation-service)
 ├── docs/ARCHITECTURE.md   Documento técnico E2E
 └── shared/contracts/      Contratos JSON compartidos
@@ -88,10 +88,23 @@ ACTIONS_SERVICE_URL=http://localhost:8092
 CONVERSATION_SERVICE_URL=http://localhost:8093
 MAX_TOOL_ROUNDS=5
 
-# Odoo (actions-service e ia-core fallback)
+# Odoo (actions-service)
 ODOO_URL=http://localhost:8069
 ODOO_DB_NAME=neobotseller
 ```
+
+## Consultas desde Cursor / desarrollo
+
+No hay MCP stdio. Usa el mismo HTTP que ia-core:
+
+```bash
+curl http://localhost:8092/v1/tools
+curl -X POST http://localhost:8092/v1/tools/call \
+  -H "Content-Type: application/json" \
+  -d '{"name":"stock_get_product","arguments":{"name":"compu bonita"}}'
+```
+
+Ver `RAG/actions-service/README.md`.
 
 ## Arranque mínimo (chat sin Odoo/RAG)
 
@@ -116,7 +129,7 @@ Odoo + Redis + conversation-service + actions-service + (opcional) Qdrant + embe
 |---------|-----------|
 | `RAG/AGENTS.md` | Pipeline mensajería, actions, embeddings |
 | `services/AGENTS.md` | ia-core, LLM, tool router |
-| `Odoo/AGENTS.md` | ERP, connectors, MCP |
+| `Odoo/AGENTS.md` | ERP, connectors |
 | `Redis/AGENTS.md` | Sesiones multi-chat |
 | `Streamlit/AGENTS.md` | Simulador dev |
 

@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
@@ -20,8 +20,11 @@ class Settings(BaseSettings):
     actions_host: str = Field(default="0.0.0.0", alias="ACTIONS_HOST")
     actions_port: int = Field(default=8092, alias="ACTIONS_PORT")
 
-    # Backends MCP
-    odoo_enabled: bool = Field(default=True, alias="ODOO_MCP_ENABLED")
+    # Backend Odoo (connectors)
+    odoo_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("ODOO_ENABLED", "ODOO_MCP_ENABLED"),
+    )
     odoo_url: str = Field(default="http://localhost:8069", alias="ODOO_URL")
     odoo_db: str = Field(default="neobotseller", alias="ODOO_DB_NAME")
     odoo_login: str = Field(default="admin", alias="ODOO_LOGIN")
