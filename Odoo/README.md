@@ -1,6 +1,6 @@
 # Odoo Local — CRM + Inventario
 
-Entorno Odoo 17 local para desarrollo del MCP de NeoBotSeller (stock y CRM).
+Entorno Odoo 17 local para NeoBotSeller (stock y CRM). Las herramientas se consumen vía **RAG/actions-service** (`:8092`), no MCP.
 
 ## Requisitos
 
@@ -59,11 +59,11 @@ docker compose --profile init run --rm odoo-init
 docker compose up -d
 ```
 
-## API para integración MCP
+## Integración (XML-RPC → actions-service)
 
-Odoo expone **XML-RPC** para el conector interno y el servidor MCP de NeoBotSeller.
+Odoo expone **XML-RPC** para el conector en `connectors/`. **actions-service** importa esa lógica y la expone por HTTP; ia-core y Cursor usan el mismo endpoint.
 
-Variables:
+Variables en `RAG/actions-service/.env`:
 
 ```env
 ODOO_URL=http://localhost:8069
@@ -72,19 +72,16 @@ ODOO_LOGIN=admin
 ODOO_USER_PASSWORD=admin
 ```
 
-### MCP personalizado (`mcp-server/`)
+Consultar tools (igual que la IA externa):
 
 ```bash
-cd mcp-server
-/opt/homebrew/bin/python3.12 -m venv .venv
-source .venv/bin/activate
-pip install -e .
-neobotseller-odoo-mcp   # stdio MCP para Cursor / ia-core
+curl http://localhost:8092/v1/tools
+curl -X POST http://localhost:8092/v1/tools/call \
+  -H "Content-Type: application/json" \
+  -d '{"name":"stock_get_product","arguments":{"name":"demo"}}'
 ```
 
-Herramientas: `stock_get_product`, `stock_check_availability`, `crm_search_lead`, `crm_create_lead`, etc.
-
-Ver [mcp-server/README.md](mcp-server/README.md).
+Ver [RAG/actions-service/README.md](../RAG/actions-service/README.md).
 
 ## Estructura
 
@@ -95,8 +92,7 @@ Odoo/
 ├── scripts/
 │   ├── init-odoo.sh      # Instala CRM + Stock
 │   └── seed-demo-data.py # Productos, stock y leads demo
-├── connectors/
-│   ├── stock/            # (próximo) conector MCP inventario
-│   └── crm/              # (próximo) conector MCP CRM
-└── mcp-server/           # (próximo) servidor MCP
+└── connectors/
+    ├── stock/            # Inventario
+    └── crm/              # CRM
 ```

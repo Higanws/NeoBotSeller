@@ -1,4 +1,4 @@
-"""Enrutador de herramientas — bucle LLM + actions-service (MCP hub)."""
+"""Enrutador de herramientas — bucle LLM + actions-service."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from typing import Any
 
 from ia_core.llm.base import LLMProvider, LLMResponse
 from ia_core.mcp_hub.actions_hub import ActionsHub
-from ia_core.mcp_hub.odoo_hub import OdooMcpHub
 
 logger = logging.getLogger(__name__)
 
@@ -25,32 +24,22 @@ class ToolRouter:
         self,
         llm: LLMProvider,
         actions_hub: ActionsHub,
-        odoo_hub: OdooMcpHub,
         max_rounds: int = 3,
     ) -> None:
         self.llm = llm
         self.actions_hub = actions_hub
-        self.odoo_hub = odoo_hub
         self.max_rounds = max_rounds
 
     def get_tool_definitions(self) -> list[dict[str, Any]]:
-        return self._get_tools() or []
-
-    def _get_tools(self) -> list[dict[str, Any]] | None:
-        if self.actions_hub.enabled:
-            tools = self.actions_hub.get_tool_definitions()
-            return tools or None
-        if self.odoo_hub.enabled:
-            return self.odoo_hub.get_tool_definitions()
-        return None
-
-    def _execute_tool(self, name: str, args: dict[str, Any]) -> str:
-        if self.actions_hub.enabled:
-            return self.actions_hub.call_tool(name, args)
-        return self.odoo_hub.call_tool(name, args)
+        if not self.actions_hub.enabled:
+            return []
+        return self.actions_hub.get_tool_definitions()
 
     def run(self, messages: list[dict[str, Any]]) -> ToolRunResult:
-        tools = self._get_tools()
+        tools = self.get_tool_definitions() or None
+        if not self.actions_hub.enabled:
+            logger.warning("actions-service no configurado; chat sin herramientas")
+
         last_response: LLMResponse | None = None
         tools_used: list[str] = []
 
@@ -79,7 +68,7 @@ class ToolRouter:
                 tools_used.append(tc.name)
                 try:
                     args = json.loads(tc.arguments) if tc.arguments else {}
-                    result = self._execute_tool(tc.name, args)
+                    result = self.actions_hub.call_tool(tc.name, args)
                 except Exception as exc:
                     logger.exception("tool error %s", tc.name)
                     result = json.dumps({"error": str(exc)}, ensure_ascii=False)

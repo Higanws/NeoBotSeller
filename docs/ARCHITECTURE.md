@@ -75,11 +75,11 @@ Meta Cloud API
 └────────────────────────────────────┼────────────────────┘
          │              │            │
          ▼              ▼            ▼
-   PostgreSQL        RAG/api     Odoo/mcp-server
-   (historial)      (Qdrant)    (stock · CRM)
+   PostgreSQL        RAG/api     RAG/actions-service
+   (historial)      (Qdrant)    (Odoo stock · CRM · RAG tools)
                          │
                          ▼
-                  Otros MCP Servers
+                  Otros backends HTTP
                          │
                          ▼
                   Meta Cloud API → Usuario
@@ -113,7 +113,6 @@ NeoBotSeller/
 │   └── retrieval-service/
 │
 ├── Odoo/
-│   ├── mcp-server/
 │   └── connectors/
 │
 ├── Redis/
@@ -202,7 +201,7 @@ POST /webhook    # Recepción de eventos
 **Dependencias externas:**
 
 - `RAG/api` — búsqueda semántica.
-- `Odoo/mcp-server` — stock y CRM.
+- `RAG/actions-service` — hub HTTP de tools (Odoo stock/CRM + RAG).
 - PostgreSQL — persistencia.
 - Redis — cola y cache.
 - Meta Graph API — envío de respuestas.
@@ -273,15 +272,15 @@ Chunks + metadata → ia-core (prompt augmentation)
 
 ### 5.6 Odoo — `Odoo/`
 
-Integración con **Odoo ERP** expuesta como **servidor MCP** para que el LLM invoque herramientas de negocio de forma controlada.
+Integración con **Odoo ERP** expuesta vía **RAG/actions-service** (HTTP) para que el LLM invoque herramientas de negocio.
 
 #### Arquitectura interna
 
 ```text
-ia-core (MCP Hub)
+ia-core (Actions Hub HTTP)
     │
     ▼
-Odoo/mcp-server/          ← Protocolo MCP (stdio / SSE / HTTP)
+RAG/actions-service/      ← GET /v1/tools · POST /v1/tools/call
     │
     ├── Odoo/connectors/stock/
     │       ├── get_product_stock
@@ -332,21 +331,19 @@ Simulador de chat en **Streamlit**, servicio independiente en la raíz (como `Od
 
 ---
 
-## 6. Capa MCP
+## 6. Capa de herramientas (actions-service)
 
 ### Objetivo
 
-Permitir que el LLM interactúe con sistemas externos de forma segura y extensible.
+Permitir que el LLM interactúe con Odoo y RAG de forma segura vía un único hub HTTP.
 
-### Servidores MCP
+### Hub
 
-| Servidor | Ubicación | Acceso |
+| Componente | Ubicación | Acceso |
 |----------|-----------|--------|
-| **Odoo MCP** | `Odoo/mcp-server/` | Stock + CRM |
-| **Filesystem MCP** | externo / ia-core | `/app/docs` |
-| **PostgreSQL MCP** | externo | Consultas SQL controladas |
-| **Brave Search MCP** | externo | Búsqueda web |
-| **Custom MCP** | extensible | Integraciones propietarias |
+| **Actions service** | `RAG/actions-service/` | Odoo stock + CRM + `rag_search_documents` |
+
+Cursor y desarrollo usan los mismos endpoints HTTP que ia-core (no MCP stdio).
 
 ### Flujo de invocación
 
@@ -523,7 +520,7 @@ qdrant
 | webhook-service | 1 → N pods (stateless) |
 | ia-core | 1 → N workers (cola Redis) |
 | RAG/api | 1 → N pods (ingesta y búsqueda) |
-| Odoo/mcp-server | 1 → N (según carga de tools) |
+| RAG/actions-service | 1 → N pods (stateless) |
 | Streamlit/ | 1 instancia local (dev) |
 | Redis | Redis Sentinel / Cluster |
 | PostgreSQL | Primary + Read Replicas |
@@ -537,7 +534,7 @@ Los servicios se comunican exclusivamente mediante contratos versionados:
 
 - **Eventos de mensaje** — webhook → Redis → ia-core.
 - **RAG API** — OpenAPI spec en `shared/contracts/rag-api.yaml`.
-- **Odoo MCP** — Tool schemas en `shared/contracts/odoo-mcp.json`.
+- **Odoo tools** — Schemas en `Odoo/connectors/tool_definitions.py`.
 - **Platform admin API** (futuro) — OpenAPI en `shared/contracts/platform-api.yaml`.
 
 ---
@@ -559,12 +556,12 @@ Los servicios se comunican exclusivamente mediante contratos versionados:
 - [ ] `RAG/api` — API unificada
 - [ ] Integración ia-core ↔ RAG
 
-### Fase 3 — MCP y Odoo
+### Fase 3 — Tools y Odoo
 
-- [ ] `Odoo/mcp-server` — servidor MCP
-- [ ] `Odoo/connectors/stock` — herramientas de inventario
-- [ ] `Odoo/connectors/crm` — herramientas CRM
-- [ ] MCP Hub en ia-core
+- [x] `RAG/actions-service` — hub HTTP de herramientas
+- [x] `Odoo/connectors/stock` — herramientas de inventario
+- [x] `Odoo/connectors/crm` — herramientas CRM
+- [x] Actions Hub en ia-core
 
 ### Fase 4 — Admin y Producción
 

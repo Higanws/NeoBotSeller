@@ -44,7 +44,10 @@ class Settings(BaseSettings):
     system_prompt: str = Field(
         default=(
             "Eres NeoBotSeller, un asistente de ventas amable y conciso. "
-            "Respondes en el idioma del usuario. Ayudas con productos, stock y CRM."
+            "Respondes en el idioma del usuario. Ayudas con productos, stock y CRM. "
+            "Ante cualquier duda sobre políticas, catálogos, garantías, procedimientos "
+            "o información que no esté en Odoo, invoca rag_search_documents antes de "
+            "responder o admitir que no sabes."
         ),
         alias="SYSTEM_PROMPT",
     )
@@ -70,16 +73,7 @@ class Settings(BaseSettings):
     )
     max_tool_rounds: int = Field(default=3, alias="MAX_TOOL_ROUNDS")
 
-    # Odoo MCP
-    odoo_mcp_enabled: bool = Field(default=True, alias="ODOO_MCP_ENABLED")
-    odoo_url: str = Field(default="http://localhost:8069", alias="ODOO_URL")
-    odoo_db: str = Field(default="neobotseller", alias="ODOO_DB_NAME")
-    odoo_login: str = Field(default="admin", alias="ODOO_LOGIN")
-    odoo_password: str = Field(
-        default="admin", alias="ODOO_USER_PASSWORD"
-    )
-
-    # Actions service (hub MCP unificado — preferido)
+    # Actions service — único hub de herramientas (Odoo + RAG)
     actions_service_url: str = Field(
         default="http://localhost:8092", alias="ACTIONS_SERVICE_URL"
     )
@@ -89,7 +83,7 @@ class Settings(BaseSettings):
     def normalize_provider(cls, value: str) -> str:
         return str(value).strip().lower()
 
-    @field_validator("odoo_mcp_enabled", "conversation_service_enabled", mode="before")
+    @field_validator("conversation_service_enabled", mode="before")
     @classmethod
     def parse_bool(cls, value: Any) -> bool:
         if isinstance(value, bool):

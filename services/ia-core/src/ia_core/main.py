@@ -68,8 +68,7 @@ async def config_info() -> dict[str, Any]:
         "llm_max_tokens": s.llm_max_tokens,
         "openai_base_url": s.openai_base_url,
         "ollama_base_url": s.ollama_base_url,
-        "odoo_mcp_enabled": s.odoo_mcp_enabled,
-        "odoo_url": s.odoo_url,
+        "actions_service_url": s.actions_service_url,
         "max_tool_rounds": s.max_tool_rounds,
     }
 

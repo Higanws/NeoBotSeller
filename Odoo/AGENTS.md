@@ -1,19 +1,18 @@
 # Odoo — Guía para agentes
 
-ERP local (Odoo 17) + **connectors XML-RPC** + **mcp-server** (stdio MCP para Cursor).
+ERP local (Odoo 17) + **connectors XML-RPC**. Las tools se exponen vía `RAG/actions-service` (HTTP).
 
 ## Estructura
 
 ```text
 Odoo/
 ├── docker-compose.yml      Odoo + PostgreSQL
-├── connectors/             Lógica de negocio + tools MCP
+├── connectors/             Lógica de negocio + contrato de tools
 │   ├── odoo_client.py      Cliente XML-RPC
 │   ├── tool_definitions.py Contrato OpenAI tools (lista completa)
 │   ├── tool_executor.py    Dispatch por nombre de tool
 │   ├── stock/service.py    Inventario
 │   └── crm/service.py      CRM, clientes, asesores
-├── mcp-server/             MCP stdio (desarrollo en Cursor)
 └── scripts/                seed-demo-data.py, init
 ```
 
@@ -58,10 +57,10 @@ python3 scripts/seed-demo-data.py   # opcional
 | Cliente | Cómo accede |
 |---------|-------------|
 | `RAG/actions-service` | sys.path → `Odoo/connectors` |
-| `services/ia-core` | Fallback vía `odoo_hub.py` (si actions no disponible) |
-| `Odoo/mcp-server` | MCP stdio para Cursor IDE |
+| `services/ia-core` | HTTP → actions-service |
+| Cursor / dev | Mismo HTTP que ia-core (curl o agente con terminal) |
 
-## Env (actions-service / ia-core)
+## Env (actions-service)
 
 ```env
 ODOO_URL=http://localhost:8069
@@ -74,4 +73,4 @@ ODOO_USER_PASSWORD=admin
 
 - Solo ORM/XML-RPC encapsulado; nunca SQL directo.
 - Archivar = `active=False`, no unlink/delete.
-- `tool_definitions.py` es la fuente de verdad del contrato MCP.
+- `tool_definitions.py` es la fuente de verdad del contrato de tools.

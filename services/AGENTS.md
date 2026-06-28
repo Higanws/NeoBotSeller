@@ -32,7 +32,6 @@ PYTHONPATH=src uvicorn ia_core.main:app --reload --port 8090
 | Tool router | `tool_router.py` | Bucle LLM ↔ tools (max rounds) |
 | Memoria | `memory/redis_store.py` | Cliente HTTP → conversation-service |
 | Actions hub | `mcp_hub/actions_hub.py` | Cliente → RAG/actions-service |
-| Odoo hub | `mcp_hub/odoo_hub.py` | Fallback directo a connectors |
 | LLM | `llm/factory.py` | OpenAI u Ollama |
 
 ### Flujo interno `process_message`
@@ -60,7 +59,6 @@ Modelo recomendado para tools: **qwen2.5:7b-instruct** o **llama3.1:8b** (3080 1
 ```env
 CONVERSATION_SERVICE_URL=http://localhost:8093
 ACTIONS_SERVICE_URL=http://localhost:8092
-ODOO_MCP_ENABLED=true   # fallback si actions cae
 ```
 
 ### Reglas
